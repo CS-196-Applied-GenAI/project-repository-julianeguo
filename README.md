@@ -1,1 +1,41 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/wOs3Tno3)
+# Backend Setup
+
+Minimal Node.js + Express backend scaffold for the Twitter/X-like app.
+
+## Requirements
+
+- Node.js 18+ (recommended)
+- npm
+
+## Environment Variables
+
+Create a `.env` file (you can copy from `.env.example`) and set:
+
+- `PORT`
+- `DB_HOST`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+- `SESSION_SECRET`
+
+These environment variables must be set for the app to run.
+
+## Install
+
+```bash
+npm install
+```
+
+## Run
+
+```bash
+node src/index.js
+```
+
+## Health Check
+
+`GET /api/health` returns:
+
+```json
+{ "ok": true }
+```

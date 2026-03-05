@@ -7,6 +7,107 @@ import { validateBio, validateUsername } from "../validation/auth.js";
 export function createUsersRouter({ queryFn = dbQuery } = {}) {
   const router = Router();
 
+  router.get("/by-username/:username", requireAuth, async (req, res) => {
+    try {
+      const usernameParam = req.params.username;
+      if (typeof usernameParam !== "string" || usernameParam.trim().length === 0) {
+        return res.status(404).json({ message: "User not found." });
+      }
+
+      const normalizedUsername = usernameParam.trim().toLowerCase();
+      const users = await queryFn(
+        `SELECT
+          u.id,
+          u.username,
+          u.bio,
+          u.profile_picture_url,
+          (SELECT COUNT(*) FROM follows f1 WHERE f1.following_id = u.id) AS follower_count,
+          (SELECT COUNT(*) FROM follows f2 WHERE f2.follower_id = u.id) AS following_count,
+          EXISTS (
+            SELECT 1
+            FROM follows f3
+            WHERE f3.follower_id = ? AND f3.following_id = u.id
+          ) AS is_following
+        FROM users u
+        WHERE LOWER(u.username) = ?
+        LIMIT 1`,
+        [req.session.userId, normalizedUsername]
+      );
+
+      if (users.length === 0) {
+        return res.status(404).json({ message: "User not found." });
+      }
+
+      const user = users[0];
+      return res.status(200).json({
+        id: user.id,
+        username: user.username,
+        bio: user.bio ?? null,
+        profile_picture_url: user.profile_picture_url ?? null,
+        follower_count: Number(user.follower_count),
+        following_count: Number(user.following_count),
+        is_following: Boolean(user.is_following)
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Internal server error." });
+    }
+  });
+
+  router.get("/:id/posts", requireAuth, async (req, res) => {
+    try {
+      const userId = Number(req.params.id);
+      if (!Number.isInteger(userId) || userId <= 0) {
+        return res.status(404).json({ message: "User not found." });
+      }
+
+      const users = await queryFn("SELECT id FROM users WHERE id = ? LIMIT 1", [userId]);
+      if (users.length === 0) {
+        return res.status(404).json({ message: "User not found." });
+      }
+
+      const posts = await queryFn(
+        `SELECT
+          p.id,
+          p.user_id,
+          p.content,
+          p.created_at,
+          (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count,
+          EXISTS (
+            SELECT 1
+            FROM likes l2
+            WHERE l2.post_id = p.id AND l2.user_id = ?
+          ) AS liked_by_me,
+          (SELECT COUNT(*) FROM retweets r WHERE r.post_id = p.id) AS retweet_count,
+          EXISTS (
+            SELECT 1
+            FROM retweets r2
+            WHERE r2.post_id = p.id AND r2.user_id = ?
+          ) AS retweeted_by_me,
+          (SELECT COUNT(*) FROM replies re WHERE re.parent_post_id = p.id) AS reply_count
+        FROM posts p
+        WHERE p.user_id = ?
+        ORDER BY p.created_at DESC`,
+        [req.session.userId, req.session.userId, userId]
+      );
+
+      return res.status(200).json(
+        posts.map((post) => ({
+          id: post.id,
+          user_id: post.user_id,
+          content: post.content,
+          created_at: post.created_at,
+          like_count: Number(post.like_count),
+          liked_by_me: Boolean(post.liked_by_me),
+          retweet_count: Number(post.retweet_count),
+          retweeted_by_me: Boolean(post.retweeted_by_me),
+          reply_count: Number(post.reply_count)
+        }))
+      );
+    } catch (error) {
+      return res.status(500).json({ message: "Internal server error." });
+    }
+  });
+
   router.post("/:id/block", requireAuth, async (req, res) => {
     try {
       const targetUserId = Number(req.params.id);

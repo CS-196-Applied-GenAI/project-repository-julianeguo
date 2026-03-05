@@ -6,7 +6,10 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "test": "node --test"
+    "test": "node --test",
+    "frontend:install": "npm install --prefix frontend",
+    "frontend:dev": "npm run dev --prefix frontend",
+    "frontend:build": "npm run build --prefix frontend"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

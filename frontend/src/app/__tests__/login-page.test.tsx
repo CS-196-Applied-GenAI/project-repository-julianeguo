@@ -37,8 +37,8 @@ describe("LoginPage", () => {
       </MemoryRouter>
     );
 
-    await userEvent.type(screen.getByLabelText(/username/i), "baker_bella");
-    await userEvent.type(screen.getByLabelText(/password/i), "Password123!");
+    await userEvent.type(screen.getAllByLabelText(/username/i)[0], "baker_bella");
+    await userEvent.type(screen.getAllByLabelText(/password/i)[0], "Password123!");
     await userEvent.click(screen.getByRole("button", { name: /log in/i }));
 
     expect(mockLogin).toHaveBeenCalledWith("baker_bella", "Password123!");

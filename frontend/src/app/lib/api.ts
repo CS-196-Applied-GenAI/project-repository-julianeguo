@@ -67,8 +67,32 @@ export interface FollowingFeedItemRetweet {
 
 export type FollowingFeedItem = FollowingFeedItemPost | FollowingFeedItemRetweet;
 
-const API_BASE = (import.meta as ImportMeta & { env: Record<string, string | undefined> }).env
-  .VITE_API_BASE;
+const apiBaseFromGlobal =
+  typeof globalThis !== "undefined" &&
+  "__VITE_API_BASE__" in globalThis &&
+  typeof (globalThis as Record<string, unknown>).__VITE_API_BASE__ === "string"
+    ? ((globalThis as Record<string, unknown>).__VITE_API_BASE__ as string)
+    : undefined;
+
+const processMaybe = (globalThis as Record<string, unknown>).process as
+  | { env?: Record<string, string | undefined> }
+  | undefined;
+
+const apiBaseFromProcess =
+  processMaybe && processMaybe.env && typeof processMaybe.env.VITE_API_BASE === "string"
+    ? processMaybe.env.VITE_API_BASE
+    : undefined;
+
+const apiBaseFromImportMeta =
+  typeof import.meta !== "undefined" &&
+  (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env &&
+  typeof (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
+    ?.VITE_API_BASE === "string"
+    ? (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
+        ?.VITE_API_BASE
+    : undefined;
+
+const API_BASE = apiBaseFromGlobal ?? apiBaseFromImportMeta ?? apiBaseFromProcess;
 
 const withBase = (path: string) => `${API_BASE ?? ""}${path}`;
 

@@ -4,6 +4,10 @@ import { requireAuth } from "../middleware/auth.js";
 import { avatarUploadMiddleware, resizeAvatarImage } from "../middleware/upload.js";
 import { validateBio, validateUsername } from "../validation/auth.js";
 
+function logUsersRouteError(routeName, error) {
+  console.error(`[users] ${routeName} failed`, error);
+}
+
 export function createUsersRouter({ queryFn = dbQuery } = {}) {
   const router = Router();
 
@@ -55,6 +59,7 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
         is_blocked: Boolean(user.is_blocked)
       });
     } catch (error) {
+      logUsersRouteError("get-by-username", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -110,6 +115,7 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
         }))
       );
     } catch (error) {
+      logUsersRouteError("get-user-posts", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -145,6 +151,7 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
 
       return res.status(204).send();
     } catch (error) {
+      logUsersRouteError("block-user", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -163,6 +170,7 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
 
       return res.status(204).send();
     } catch (error) {
+      logUsersRouteError("unblock-user", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -190,6 +198,7 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
 
       return res.status(204).send();
     } catch (error) {
+      logUsersRouteError("follow-user", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -208,6 +217,7 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
 
       return res.status(204).send();
     } catch (error) {
+      logUsersRouteError("unfollow-user", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -242,6 +252,7 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
         profile_picture_url: updatedUser.profile_picture_url ?? null
       });
     } catch (error) {
+      logUsersRouteError("upload-avatar", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -310,6 +321,7 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
         profile_picture_url: updatedUser.profile_picture_url ?? null
       });
     } catch (error) {
+      logUsersRouteError("update-me", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -361,6 +373,7 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
         is_blocked: Boolean(user.is_blocked)
       });
     } catch (error) {
+      logUsersRouteError("get-by-id", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });

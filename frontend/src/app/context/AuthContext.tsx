@@ -5,6 +5,7 @@ import {
   logout as apiLogout,
   me as apiMe,
   signup as apiSignup,
+  uploadMyAvatar as apiUploadMyAvatar,
   updateMyProfile as apiUpdateMyProfile,
 } from '../lib/api';
 
@@ -21,6 +22,7 @@ interface AuthContextType {
   updateProfile: (
     payload: { username?: string; bio?: string | null }
   ) => Promise<{ success: boolean; message?: string; user?: User }>;
+  uploadAvatar: (file: File) => Promise<{ success: boolean; message?: string; user?: User }>;
   isLoading: boolean;
   updateLastActivity: () => void;
 }
@@ -180,6 +182,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const uploadAvatar = async (
+    file: File
+  ): Promise<{ success: boolean; message?: string; user?: User }> => {
+    try {
+      const updatedUser = await apiUploadMyAvatar(file);
+      setUser(updatedUser);
+      updateLastActivity();
+      return { success: true, user: updatedUser };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Avatar upload failed.';
+      return { success: false, message };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -189,6 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         refreshUser,
         updateProfile,
+        uploadAvatar,
         isLoading,
         updateLastActivity,
       }}

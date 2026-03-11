@@ -65,12 +65,15 @@ export async function resizeAvatarImage(req, res, next) {
       return res.status(400).json({ message: "Avatar file is required." });
     }
 
-    await sharp(req.file.path).resize(400, 400, { fit: "cover" }).toFile(`${req.file.path}.tmp`);
-    fs.renameSync(`${req.file.path}.tmp`, req.file.path);
+    const resizedBuffer = await sharp(req.file.path)
+      .resize(400, 400, { fit: "cover" })
+      .toBuffer();
+    fs.writeFileSync(req.file.path, resizedBuffer);
 
     return next();
   } catch (error) {
-    return next(error);
+    console.error("[upload] resize-avatar failed", error);
+    return res.status(500).json({ message: "Failed to process avatar image." });
   }
 }
 

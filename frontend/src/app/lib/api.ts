@@ -89,12 +89,16 @@ const API_BASE = apiBaseFromGlobal ?? apiBaseFromProcess;
 const withBase = (path: string) => `${API_BASE ?? ""}${path}`;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormDataPayload =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
   const response = await fetch(withBase(path), {
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {})
-    },
+    headers: isFormDataPayload
+      ? init?.headers
+      : {
+          "Content-Type": "application/json",
+          ...(init?.headers ?? {})
+        },
     ...init
   });
 
@@ -245,5 +249,15 @@ export async function updateMyProfile(payload: {
   return request<User>("/api/users/me", {
     method: "PATCH",
     body: JSON.stringify(payload)
+  });
+}
+
+export async function uploadMyAvatar(file: File): Promise<User> {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  return request<User>("/api/users/me/avatar", {
+    method: "PATCH",
+    body: formData
   });
 }

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { LogOut, UserPlus, UserMinus, Ban, Shield } from 'lucide-react';
+import { LogOut, UserPlus, UserMinus, Ban, Shield, Upload } from 'lucide-react';
 import { Navigation } from '../components/Navigation';
 import { SliceCard, SliceView } from '../components/SliceCard';
 import { PostSliceModal } from '../components/PostSliceModal';
@@ -32,10 +32,13 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 
+const MAX_AVATAR_FILE_SIZE_BYTES = 2 * 1024 * 1024;
+const ALLOWED_AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png']);
+
 export function ProfilePage() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
-  const { user: currentUser, logout, updateProfile } = useAuth();
+  const { user: currentUser, logout, updateProfile, uploadAvatar } = useAuth();
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
@@ -45,6 +48,12 @@ export function ProfilePage() {
   const [editBio, setEditBio] = useState('');
   const [editError, setEditError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [selectedAvatarName, setSelectedAvatarName] = useState('');
+  const [selectedAvatarPreviewUrl, setSelectedAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState('');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!username) return;
@@ -70,6 +79,14 @@ export function ProfilePage() {
     };
     void load();
   }, [navigate, username]);
+
+  useEffect(() => {
+    return () => {
+      if (selectedAvatarPreviewUrl) {
+        URL.revokeObjectURL(selectedAvatarPreviewUrl);
+      }
+    };
+  }, [selectedAvatarPreviewUrl]);
 
   if (!profileUser) {
     return null;
@@ -155,6 +172,91 @@ export function ProfilePage() {
     }
   };
 
+  const handleAvatarSelection = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setAvatarError('');
+
+    if (selectedAvatarPreviewUrl) {
+      URL.revokeObjectURL(selectedAvatarPreviewUrl);
+      setSelectedAvatarPreviewUrl(null);
+    }
+
+    if (!file) {
+      setSelectedAvatarFile(null);
+      setSelectedAvatarName('');
+      return;
+    }
+
+    if (!ALLOWED_AVATAR_MIME_TYPES.has(file.type)) {
+      setSelectedAvatarFile(null);
+      setSelectedAvatarName('');
+      setAvatarError('Profile pictures must be JPEG or PNG files.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_FILE_SIZE_BYTES) {
+      setSelectedAvatarFile(null);
+      setSelectedAvatarName('');
+      setAvatarError('Profile pictures must be 2MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+
+    setSelectedAvatarFile(file);
+    setSelectedAvatarName(file.name);
+    setSelectedAvatarPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!selectedAvatarFile) {
+      setAvatarError('Select a JPEG or PNG image to upload.');
+      return;
+    }
+
+    setAvatarError('');
+    setIsUploadingAvatar(true);
+
+    try {
+      const result = await uploadAvatar(selectedAvatarFile);
+
+      if (!result.success || !result.user) {
+        const message = result.message || 'Avatar upload failed.';
+        setAvatarError(message);
+        toast.error(message);
+        return;
+      }
+
+      setProfileUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              profile_picture_url: result.user.profile_picture_url ?? null
+            }
+          : prev
+      );
+      setUserSlices((prev) =>
+        prev.map((slice) => ({
+          ...slice,
+          profile_picture_url: result.user?.profile_picture_url ?? null
+        }))
+      );
+      setSelectedAvatarFile(null);
+      setSelectedAvatarName('');
+      if (selectedAvatarPreviewUrl) {
+        URL.revokeObjectURL(selectedAvatarPreviewUrl);
+        setSelectedAvatarPreviewUrl(null);
+      }
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
+      window.dispatchEvent(new Event('feed:refresh'));
+      toast.success('Profile picture updated!');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   const handleCreatePost = async (content: string) => {
     await createPost(content);
     window.dispatchEvent(new Event('feed:refresh'));
@@ -175,7 +277,9 @@ export function ProfilePage() {
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-start gap-4">
               <Avatar className="w-20 h-20 border-2 border-border">
-                <AvatarImage src={getAssetUrl(profileUser.profile_picture_url) ?? undefined} />
+                <AvatarImage
+                  src={selectedAvatarPreviewUrl ?? getAssetUrl(profileUser.profile_picture_url) ?? undefined}
+                />
                 <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                   {profileUser.username.charAt(0).toUpperCase()}
                 </AvatarFallback>
@@ -250,6 +354,39 @@ export function ProfilePage() {
 
           {isOwnProfile ? (
             <div className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="profile-avatar" className="text-sm font-medium text-foreground">
+                  Profile picture
+                </label>
+                <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Input
+                    ref={avatarInputRef}
+                    id="profile-avatar"
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    onChange={handleAvatarSelection}
+                    className="border-2 border-border bg-input-background file:mr-4 file:border-0 file:bg-transparent file:text-sm file:font-medium"
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => void handleAvatarUpload()}
+                    disabled={isUploadingAvatar}
+                    variant="outline"
+                    className="border-2 border-border"
+                  >
+                    <Upload size={16} className="mr-2" />
+                    Upload Picture
+                  </Button>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  JPEG or PNG only, up to 2MB.
+                </p>
+                {selectedAvatarName ? (
+                  <p className="mt-2 text-sm text-muted-foreground">{selectedAvatarName}</p>
+                ) : null}
+                {avatarError ? <p className="mt-2 text-sm text-destructive">{avatarError}</p> : null}
+              </div>
+
               <div>
                 <label htmlFor="profile-username" className="text-sm font-medium text-foreground">
                   Username

@@ -33,6 +33,7 @@ const mockAuth = {
   logout: jest.fn(),
   refreshUser: jest.fn(),
   updateProfile: jest.fn(),
+  uploadAvatar: jest.fn(),
   isLoading: false,
   updateLastActivity: jest.fn(),
 };
@@ -345,6 +346,56 @@ describe("frontend integration flows", () => {
       expect(screen.getByText("@alice_new")).toBeInTheDocument();
       expect(mockedToast.success).toHaveBeenCalledWith("Profile saved!");
     });
+  });
+
+  test("own profile can upload a profile picture", async () => {
+    mockedApi.getUserByUsername.mockResolvedValue({
+      id: 1,
+      username: "alice",
+      bio: "hello",
+      profile_picture_url: null,
+      follower_count: 2,
+      following_count: 3,
+      is_following: false,
+      is_blocked: false,
+    });
+    mockedApi.getUserPosts.mockResolvedValue([]);
+    mockAuth.uploadAvatar.mockResolvedValue({
+      success: true,
+      user: {
+        id: 1,
+        username: "alice",
+        email: "alice@example.com",
+        bio: "hello",
+        profile_picture_url: "/uploads/profiles/avatar.png",
+      },
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/profile/alice"]}>
+        <Routes>
+          <Route path="/profile/:username" element={<ProfilePage />} />
+          <Route path="/404" element={<div>not found</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("@alice")).toBeInTheDocument();
+
+    const fileInput = screen.getByLabelText("Profile picture");
+    const file = new File(["avatar"], "avatar.png", { type: "image/png" });
+
+    await user.upload(fileInput, file);
+    await user.click(screen.getByRole("button", { name: "Upload Picture" }));
+
+    await waitFor(() => {
+      expect(mockAuth.uploadAvatar).toHaveBeenCalledWith(file);
+      expect(mockedToast.success).toHaveBeenCalledWith("Profile picture updated!");
+    });
+
+    expect(fileInput).toHaveValue("");
   });
 
   test("profile page supports follow, unfollow, block, unblock, and logout", async () => {

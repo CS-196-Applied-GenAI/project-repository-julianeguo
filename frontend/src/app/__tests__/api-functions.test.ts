@@ -25,6 +25,7 @@ import {
   unfollowUser,
   unlikePost,
   unretweetPost,
+  uploadMyAvatar,
   updateMyProfile,
 } from "../lib/api";
 
@@ -70,6 +71,10 @@ describe("api.ts functions", () => {
       mockJsonResponse({ id: 1, username: "updated", bio: "bio", profile_picture_url: null })
     );
     await updateMyProfile({ username: "updated", bio: "bio" });
+    fetchMock.mockResolvedValueOnce(
+      mockJsonResponse({ id: 1, username: "updated", bio: "bio", profile_picture_url: "/uploads/profiles/avatar.png" })
+    );
+    await uploadMyAvatar(new File(["avatar"], "avatar.png", { type: "image/png" }));
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -106,6 +111,16 @@ describe("api.ts functions", () => {
       "/api/users/me",
       expect.objectContaining({ method: "PATCH", credentials: "include" })
     );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      8,
+      "/api/users/me/avatar",
+      expect.objectContaining({
+        method: "PATCH",
+        credentials: "include",
+        body: expect.any(FormData)
+      })
+    );
+    expect(fetchMock.mock.calls[7]?.[1]?.headers).toBeUndefined();
   });
 
   test("feed/post/reply API functions call expected endpoints", async () => {

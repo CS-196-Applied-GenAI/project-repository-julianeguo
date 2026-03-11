@@ -13,6 +13,7 @@ function Harness() {
   return (
     <div>
       <div data-testid="username">{auth.user?.username ?? "none"}</div>
+      <div data-testid="avatar-url">{auth.user?.profile_picture_url ?? "none"}</div>
       <button
         onClick={async () => {
           await auth.login("bella", "Password123!");
@@ -33,6 +34,13 @@ function Harness() {
         }}
       >
         logout
+      </button>
+      <button
+        onClick={async () => {
+          await auth.uploadAvatar(new File(["avatar"], "avatar.png", { type: "image/png" }));
+        }}
+      >
+        upload avatar
       </button>
     </div>
   );
@@ -146,6 +154,38 @@ describe("AuthContext", () => {
     await waitFor(() => {
       expect(mockedApi.logout).toHaveBeenCalled();
       expect(screen.getByTestId("username")).toHaveTextContent("none");
+    });
+  });
+
+  test("uploadAvatar updates the current user profile picture", async () => {
+    mockedApi.me.mockResolvedValue({
+      id: 1,
+      username: "bella",
+      bio: null,
+      profile_picture_url: null,
+    });
+    mockedApi.uploadMyAvatar.mockResolvedValue({
+      id: 1,
+      username: "bella",
+      bio: null,
+      profile_picture_url: "/uploads/profiles/avatar.png",
+    });
+
+    render(
+      <AuthProvider>
+        <Harness />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("username")).toHaveTextContent("bella");
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "upload avatar" }));
+
+    await waitFor(() => {
+      expect(mockedApi.uploadMyAvatar).toHaveBeenCalledWith(expect.any(File));
+      expect(screen.getByTestId("avatar-url")).toHaveTextContent("/uploads/profiles/avatar.png");
     });
   });
 });

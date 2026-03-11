@@ -27,3 +27,7 @@ class ResizeObserverMock {
 (global as any).TextEncoder = TextEncoder;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (global as any).TextDecoder = TextDecoder;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(global as any).URL.createObjectURL = jest.fn(() => "blob:preview-avatar");
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(global as any).URL.revokeObjectURL = jest.fn();

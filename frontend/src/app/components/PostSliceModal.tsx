@@ -4,7 +4,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { getAssetUrl } from '../lib/api';
 
 interface PostSliceModalProps {
   open: boolean;
@@ -78,6 +79,10 @@ export function PostSliceModal({
         
         <div className="flex gap-3">
           <Avatar className="w-12 h-12 border-2 border-border">
+            <AvatarImage
+              src={getAssetUrl(user.profile_picture_url) ?? undefined}
+              alt={`${user.username} avatar`}
+            />
             <AvatarFallback className="bg-primary text-primary-foreground">
               {user.username.charAt(0).toUpperCase()}
             </AvatarFallback>

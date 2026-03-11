@@ -4,6 +4,10 @@ import { requireAuth } from "../middleware/auth.js";
 import { getBlockedSet } from "../services/block.js";
 import { validatePostContent } from "../validation/post.js";
 
+function logPostRouteError(routeName, error) {
+  console.error(`[posts] ${routeName} failed`, error);
+}
+
 export function createPostsRouter({ queryFn = dbQuery } = {}) {
   const router = Router();
 
@@ -26,6 +30,7 @@ export function createPostsRouter({ queryFn = dbQuery } = {}) {
 
       return res.status(201).json(posts[0]);
     } catch (error) {
+      logPostRouteError("create", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -49,6 +54,7 @@ export function createPostsRouter({ queryFn = dbQuery } = {}) {
       await queryFn("DELETE FROM posts WHERE id = ?", [postId]);
       return res.status(204).send();
     } catch (error) {
+      logPostRouteError("delete", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -71,6 +77,7 @@ export function createPostsRouter({ queryFn = dbQuery } = {}) {
       ]);
       return res.status(204).send();
     } catch (error) {
+      logPostRouteError("like", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -88,6 +95,7 @@ export function createPostsRouter({ queryFn = dbQuery } = {}) {
       ]);
       return res.status(204).send();
     } catch (error) {
+      logPostRouteError("unlike", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -110,6 +118,7 @@ export function createPostsRouter({ queryFn = dbQuery } = {}) {
       ]);
       return res.status(204).send();
     } catch (error) {
+      logPostRouteError("retweet", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -127,6 +136,7 @@ export function createPostsRouter({ queryFn = dbQuery } = {}) {
       ]);
       return res.status(204).send();
     } catch (error) {
+      logPostRouteError("unretweet", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -154,12 +164,24 @@ export function createPostsRouter({ queryFn = dbQuery } = {}) {
         [req.session.userId, postId, content]
       );
       const replies = await queryFn(
-        "SELECT id, user_id, parent_post_id, content, created_at FROM replies WHERE id = ? LIMIT 1",
+        `SELECT
+          r.id,
+          r.user_id,
+          r.parent_post_id,
+          r.content,
+          r.created_at,
+          u.username,
+          u.profile_picture_url
+        FROM replies r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.id = ?
+        LIMIT 1`,
         [insertResult.insertId]
       );
 
       return res.status(201).json(replies[0]);
     } catch (error) {
+      logPostRouteError("create-reply", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -195,6 +217,7 @@ export function createPostsRouter({ queryFn = dbQuery } = {}) {
 
       return res.status(200).json(replies.filter((reply) => !blockedSet.has(reply.user_id)));
     } catch (error) {
+      logPostRouteError("get-replies", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -251,6 +274,7 @@ export function createPostsRouter({ queryFn = dbQuery } = {}) {
         retweeted_by_me: Boolean(post.retweeted_by_me)
       });
     } catch (error) {
+      logPostRouteError("get-post", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });

@@ -7,7 +7,7 @@ import { Label } from '../components/ui/label';
 import { useAuth } from '../context/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 
-export function LoginPage() {
+export function LoginPage({ initialTab = 'login' }: { initialTab?: 'login' | 'signup' }) {
   const navigate = useNavigate();
   const { login, signup } = useAuth();
   
@@ -97,7 +97,7 @@ export function LoginPage() {
 
         {/* Auth tabs */}
         <div className="bg-card border-2 border-border p-6 rounded-lg">
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs defaultValue={initialTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6 bg-secondary border-2 border-border">
               <TabsTrigger value="login" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Log In

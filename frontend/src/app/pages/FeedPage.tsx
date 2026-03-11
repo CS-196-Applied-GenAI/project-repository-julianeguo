@@ -63,6 +63,20 @@ export function FeedPage() {
     void loadFeed();
   }, [loadFeed]);
 
+  useEffect(() => {
+    const handleFeedRefresh = () => {
+      void loadFeed();
+    };
+
+    window.addEventListener('feed:refresh', handleFeedRefresh);
+    window.addEventListener('focus', handleFeedRefresh);
+
+    return () => {
+      window.removeEventListener('feed:refresh', handleFeedRefresh);
+      window.removeEventListener('focus', handleFeedRefresh);
+    };
+  }, [loadFeed]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -111,7 +125,13 @@ export function FeedPage() {
 
   const handlePost = async (content: string) => {
     await createPost(content);
+    window.dispatchEvent(new Event('feed:refresh'));
     await loadFeed();
+  };
+
+  const handleDeletePost = (postId: number) => {
+    setForYouItems((prev) => prev.filter((item) => item.slice.id !== postId));
+    setFollowingItems((prev) => prev.filter((item) => item.slice.id !== postId));
   };
 
   return (
@@ -150,7 +170,7 @@ export function FeedPage() {
           <TabsContent value="for-you" className="mt-0">
             <div className="space-y-0">
               {forYouItems.map((item) => (
-                <SliceCard key={item.slice.id} slice={item.slice} />
+                <SliceCard key={item.slice.id} slice={item.slice} onDelete={handleDeletePost} />
               ))}
             </div>
           </TabsContent>
@@ -163,6 +183,7 @@ export function FeedPage() {
                     key={`${item.slice.id}-${index}`}
                     slice={item.slice}
                     showRepostedBy={item.showRepostedBy}
+                    onDelete={handleDeletePost}
                   />
                 ))
               ) : (

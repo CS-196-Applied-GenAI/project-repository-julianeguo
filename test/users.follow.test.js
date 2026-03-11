@@ -48,7 +48,7 @@ function createFollowQueryMock({ users = [], follows = [] } = {}) {
     }
 
     if (sql.startsWith("SELECT") && sql.includes("FROM users u")) {
-      const [viewerId, userId] = params;
+      const [viewerId, , userId] = params;
       const user = state.users.find((row) => row.id === userId);
       if (!user) {
         return [];

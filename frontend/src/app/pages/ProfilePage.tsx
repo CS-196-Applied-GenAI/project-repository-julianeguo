@@ -6,6 +6,8 @@ import { SliceCard, SliceView } from '../components/SliceCard';
 import { PostSliceModal } from '../components/PostSliceModal';
 import { Button } from '../components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +20,7 @@ import {
 } from '../components/ui/alert-dialog';
 import {
   blockUser,
+  createPost,
   followUser,
   getAssetUrl,
   getUserByUsername,
@@ -27,16 +30,21 @@ import {
   unfollowUser,
 } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
 
 export function ProfilePage() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
-  const { user: currentUser, logout } = useAuth();
+  const { user: currentUser, logout, updateProfile } = useAuth();
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [profileUser, setProfileUser] = useState<ProfileUser | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [userSlices, setUserSlices] = useState<SliceView[]>([]);
+  const [editUsername, setEditUsername] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editError, setEditError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!username) return;
@@ -44,6 +52,9 @@ export function ProfilePage() {
       try {
         const profile = await getUserByUsername(username);
         setProfileUser(profile);
+        setIsBlocked(Boolean(profile.is_blocked));
+        setEditUsername(profile.username);
+        setEditBio(profile.bio ?? '');
         const posts = await getUserPosts(profile.id);
         setUserSlices(
           posts.map((post) => ({
@@ -74,6 +85,7 @@ export function ProfilePage() {
   const handleFollow = async () => {
     if (profileUser.is_following) {
       await unfollowUser(profileUser.id);
+      window.dispatchEvent(new Event('feed:refresh'));
       setProfileUser((prev) =>
         prev
           ? { ...prev, is_following: false, follower_count: Math.max(0, prev.follower_count - 1) }
@@ -83,6 +95,7 @@ export function ProfilePage() {
     }
 
     await followUser(profileUser.id);
+    window.dispatchEvent(new Event('feed:refresh'));
     setProfileUser((prev) =>
       prev ? { ...prev, is_following: true, follower_count: prev.follower_count + 1 } : prev
     );
@@ -91,17 +104,66 @@ export function ProfilePage() {
   const handleBlock = async () => {
     if (isBlocked) {
       await unblockUser(profileUser.id);
+      window.dispatchEvent(new Event('feed:refresh'));
       setIsBlocked(false);
       return;
     }
 
     await blockUser(profileUser.id);
+    window.dispatchEvent(new Event('feed:refresh'));
     setIsBlocked(true);
     setProfileUser((prev) =>
       prev
         ? { ...prev, is_following: false, follower_count: Math.max(0, prev.follower_count - 1) }
         : prev
     );
+  };
+
+  const handleProfileSave = async () => {
+    setEditError('');
+    setIsSaving(true);
+
+    try {
+      const result = await updateProfile({
+        username: editUsername,
+        bio: editBio
+      });
+
+      if (!result.success || !result.user) {
+        setEditError(result.message || 'Profile update failed.');
+        return;
+      }
+
+      setProfileUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              username: result.user.username,
+              bio: result.user.bio ?? null,
+              profile_picture_url: result.user.profile_picture_url ?? null
+            }
+          : prev
+      );
+
+      if (username !== result.user.username) {
+        navigate(`/profile/${result.user.username}`, { replace: true });
+      }
+      window.dispatchEvent(new Event('feed:refresh'));
+      toast.success('Profile saved!');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCreatePost = async (content: string) => {
+    await createPost(content);
+    window.dispatchEvent(new Event('feed:refresh'));
+    navigate('/feed');
+  };
+
+  const handleDeletePost = (postId: number) => {
+    setUserSlices((prev) => prev.filter((slice) => slice.id !== postId));
+    window.dispatchEvent(new Event('feed:refresh'));
   };
 
   return (
@@ -186,12 +248,52 @@ export function ProfilePage() {
             </div>
           </div>
 
-          {profileUser.bio && <p className="text-foreground mt-4">{profileUser.bio}</p>}
+          {isOwnProfile ? (
+            <div className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="profile-username" className="text-sm font-medium text-foreground">
+                  Username
+                </label>
+                <Input
+                  id="profile-username"
+                  value={editUsername}
+                  onChange={(event) => setEditUsername(event.target.value)}
+                  className="mt-2 border-2 border-border bg-input-background"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="profile-bio" className="text-sm font-medium text-foreground">
+                  Bio
+                </label>
+                <Textarea
+                  id="profile-bio"
+                  value={editBio}
+                  onChange={(event) => setEditBio(event.target.value)}
+                  className="mt-2 border-2 border-border bg-input-background"
+                />
+              </div>
+
+              {editError ? <p className="text-sm text-destructive">{editError}</p> : null}
+
+              <Button
+                onClick={() => void handleProfileSave()}
+                disabled={isSaving}
+                className="bg-primary text-primary-foreground border-2 border-border hover:bg-primary/90"
+              >
+                Save Profile
+              </Button>
+            </div>
+          ) : (
+            profileUser.bio && <p className="text-foreground mt-4">{profileUser.bio}</p>
+          )}
         </div>
 
         <div className="mt-0">
           {userSlices.length > 0 ? (
-            userSlices.map((slice) => <SliceCard key={slice.id} slice={slice} />)
+            userSlices.map((slice) => (
+              <SliceCard key={slice.id} slice={slice} onDelete={handleDeletePost} />
+            ))
           ) : (
             <div className="p-8 text-center border-2 border-border bg-card">
               <p className="text-muted-foreground">No slices yet</p>
@@ -200,7 +302,11 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <PostSliceModal open={postModalOpen} onClose={() => setPostModalOpen(false)} />
+      <PostSliceModal
+        open={postModalOpen}
+        onClose={() => setPostModalOpen(false)}
+        onPost={handleCreatePost}
+      />
 
       <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
         <AlertDialogContent className="bg-card border-2 border-border">

@@ -10,7 +10,8 @@ function createFollowingFeedQueryMock({
   retweets = [],
   follows = [],
   blocks = [],
-  likes = []
+  likes = [],
+  replies = []
 } = {}) {
   return async function queryFn(sql, params = []) {
     if (sql.startsWith("SELECT id, username, password_hash FROM users WHERE LOWER(username)")) {
@@ -39,9 +40,7 @@ function createFollowingFeedQueryMock({
     }
 
     if (sql.startsWith("SELECT") && sql.includes("FROM posts p") && sql.includes("WHERE p.user_id IN")) {
-      const viewerId = params[params.length - 2];
-      const retweetViewerId = params[params.length - 1];
-      const followedIds = params.slice(0, -2);
+      const [viewerId, retweetViewerId, ...followedIds] = params;
       return posts
         .filter((post) => followedIds.includes(post.user_id))
         .map((post) => {
@@ -52,6 +51,7 @@ function createFollowingFeedQueryMock({
           const retweetedByMe = retweets.some(
             (row) => row.post_id === post.id && row.user_id === retweetViewerId
           );
+          const replyCount = replies.filter((row) => row.parent_post_id === post.id).length;
           return {
             id: post.id,
             user_id: post.user_id,
@@ -62,16 +62,15 @@ function createFollowingFeedQueryMock({
             like_count: likeCount,
             liked_by_me: likedByMe ? 1 : 0,
             retweet_count: retweetCount,
-            retweeted_by_me: retweetedByMe ? 1 : 0
+            retweeted_by_me: retweetedByMe ? 1 : 0,
+            reply_count: replyCount
           };
         })
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
 
     if (sql.startsWith("SELECT") && sql.includes("FROM retweets r")) {
-      const viewerId = params[params.length - 2];
-      const retweetViewerId = params[params.length - 1];
-      const followedIds = params.slice(0, -2);
+      const [viewerId, retweetViewerId, ...followedIds] = params;
       return retweets
         .filter((retweet) => followedIds.includes(retweet.user_id))
         .map((retweet) => {
@@ -84,6 +83,7 @@ function createFollowingFeedQueryMock({
           const retweetedByMe = retweets.some(
             (row) => row.post_id === post.id && row.user_id === retweetViewerId
           );
+          const replyCount = replies.filter((row) => row.parent_post_id === post.id).length;
           return {
             retweet_id: retweet.id,
             retweeter_id: retweet.user_id,
@@ -98,6 +98,7 @@ function createFollowingFeedQueryMock({
             original_liked_by_me: likedByMe ? 1 : 0,
             original_retweet_count: retweetCount,
             original_retweeted_by_me: retweetedByMe ? 1 : 0,
+            original_reply_count: replyCount,
             original_author_username: originalAuthor?.username ?? null,
             original_author_profile_picture_url: originalAuthor?.profile_picture_url ?? null
           };
@@ -176,8 +177,21 @@ test("GET /api/feed/following returns followed users' posts/retweets, newest fir
     { user_id: 2, post_id: 3 },
     { user_id: 4, post_id: 2 }
   ];
+  const replies = [
+    { id: 1, parent_post_id: 3 },
+    { id: 2, parent_post_id: 3 },
+    { id: 3, parent_post_id: 2 }
+  ];
 
-  const queryFn = createFollowingFeedQueryMock({ users, posts, retweets, follows, blocks, likes });
+  const queryFn = createFollowingFeedQueryMock({
+    users,
+    posts,
+    retweets,
+    follows,
+    blocks,
+    likes,
+    replies
+  });
   const app = createApp({ authQueryFn: queryFn, feedQueryFn: queryFn, sessionSecret: "test-secret" });
   const agent = request.agent(app);
 
@@ -198,6 +212,7 @@ test("GET /api/feed/following returns followed users' posts/retweets, newest fir
       assert.equal(Object.hasOwn(item.post, "liked_by_me"), true);
       assert.equal(Object.hasOwn(item.post, "retweet_count"), true);
       assert.equal(Object.hasOwn(item.post, "retweeted_by_me"), true);
+      assert.equal(Object.hasOwn(item.post, "reply_count"), true);
     } else if (item.type === "retweet") {
       assert.equal([2, 3].includes(item.retweeter.id), true);
       assert.ok(item.post.id);
@@ -207,6 +222,7 @@ test("GET /api/feed/following returns followed users' posts/retweets, newest fir
       assert.equal(Object.hasOwn(item.post, "liked_by_me"), true);
       assert.equal(Object.hasOwn(item.post, "retweet_count"), true);
       assert.equal(Object.hasOwn(item.post, "retweeted_by_me"), true);
+      assert.equal(Object.hasOwn(item.post, "reply_count"), true);
     } else {
       assert.fail("Unexpected feed item type");
     }

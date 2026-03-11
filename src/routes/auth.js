@@ -10,6 +10,21 @@ import {
 } from "../services/passwordResetToken.js";
 import { validateEmail, validatePassword, validateUsername } from "../validation/auth.js";
 
+function logAuthRouteError(routeName, error) {
+  console.error(`[auth] ${routeName} failed`, error);
+}
+
+function getPublicErrorMessage(error) {
+  if (
+    error instanceof Error &&
+    error.message.startsWith("Database configuration is missing required environment variables:")
+  ) {
+    return error.message;
+  }
+
+  return "Internal server error.";
+}
+
 export function createSignupHandler({ queryFn = dbQuery } = {}) {
   return async (req, res) => {
     try {
@@ -60,7 +75,8 @@ export function createSignupHandler({ queryFn = dbQuery } = {}) {
         email: normalizedEmail
       });
     } catch (error) {
-      res.status(500).json({ message: "Internal server error." });
+      logAuthRouteError("signup", error);
+      res.status(500).json({ message: getPublicErrorMessage(error) });
     }
   };
 }
@@ -123,7 +139,8 @@ export function createLoginHandler({ queryFn = dbQuery } = {}) {
         username: user.username
       });
     } catch (error) {
-      return res.status(500).json({ message: "Internal server error." });
+      logAuthRouteError("login", error);
+      return res.status(500).json({ message: getPublicErrorMessage(error) });
     }
   };
 }
@@ -162,7 +179,8 @@ export function createMeHandler({ queryFn = dbQuery } = {}) {
         profile_picture_url: user.profile_picture_url ?? null
       });
     } catch (error) {
-      return res.status(500).json({ message: "Internal server error." });
+      logAuthRouteError("me", error);
+      return res.status(500).json({ message: getPublicErrorMessage(error) });
     }
   };
 }
@@ -198,7 +216,8 @@ export function createForgotPasswordHandler({
 
       return res.status(200).json(genericMessage);
     } catch (error) {
-      return res.status(500).json({ message: "Internal server error." });
+      logAuthRouteError("forgot-password", error);
+      return res.status(500).json({ message: getPublicErrorMessage(error) });
     }
   };
 }
@@ -234,7 +253,8 @@ export function createResetPasswordHandler({
 
       return res.status(204).send();
     } catch (error) {
-      return res.status(500).json({ message: "Internal server error." });
+      logAuthRouteError("reset-password", error);
+      return res.status(500).json({ message: getPublicErrorMessage(error) });
     }
   };
 }

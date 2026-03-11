@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
@@ -69,6 +69,11 @@ export function PostSliceModal({
           <DialogTitle className="text-foreground">
             {replyToSliceId ? `Reply to @${replyToUsername}` : 'Post a Slice'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {replyToSliceId
+              ? `Write and publish a reply to ${replyToUsername}.`
+              : 'Write and publish a new post.'}
+          </DialogDescription>
         </DialogHeader>
         
         <div className="flex gap-3">

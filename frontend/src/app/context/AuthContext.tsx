@@ -5,6 +5,7 @@ import {
   logout as apiLogout,
   me as apiMe,
   signup as apiSignup,
+  updateMyProfile as apiUpdateMyProfile,
 } from '../lib/api';
 
 interface AuthContextType {
@@ -16,6 +17,10 @@ interface AuthContextType {
     password: string
   ) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<User | null>;
+  updateProfile: (
+    payload: { username?: string; bio?: string | null }
+  ) => Promise<{ success: boolean; message?: string; user?: User }>;
   isLoading: boolean;
   updateLastActivity: () => void;
 }
@@ -106,6 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('lastActivity', now.toString());
   };
 
+  const refreshUser = async (): Promise<User | null> => {
+    try {
+      const currentUser = await apiMe();
+      setUser(currentUser);
+      return currentUser;
+    } catch {
+      setUser(null);
+      return null;
+    }
+  };
+
   const login = async (
     username: string,
     password: string
@@ -150,8 +166,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('lastActivity');
   };
 
+  const updateProfile = async (
+    payload: { username?: string; bio?: string | null }
+  ): Promise<{ success: boolean; message?: string; user?: User }> => {
+    try {
+      const updatedUser = await apiUpdateMyProfile(payload);
+      setUser(updatedUser);
+      updateLastActivity();
+      return { success: true, user: updatedUser };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Profile update failed.';
+      return { success: false, message };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, isLoading, updateLastActivity }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        signup,
+        logout,
+        refreshUser,
+        updateProfile,
+        isLoading,
+        updateLastActivity,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

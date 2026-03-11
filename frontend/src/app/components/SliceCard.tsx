@@ -1,8 +1,27 @@
-import { Heart, MessageCircle, Repeat2 } from 'lucide-react';
+import { Heart, MessageCircle, Repeat2, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { getAssetUrl, likePost, Post, retweetPost, unlikePost, unretweetPost } from '../lib/api';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
+import {
+  deletePost,
+  getAssetUrl,
+  likePost,
+  Post,
+  retweetPost,
+  unlikePost,
+  unretweetPost,
+} from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 export interface SliceView extends Post {
   username: string;
@@ -12,14 +31,17 @@ export interface SliceView extends Post {
 interface SliceCardProps {
   slice: SliceView;
   showRepostedBy?: { username: string } | null;
+  onDelete?: (postId: number) => void;
 }
 
-export function SliceCard({ slice, showRepostedBy }: SliceCardProps) {
+export function SliceCard({ slice, showRepostedBy, onDelete }: SliceCardProps) {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [liked, setLiked] = useState(slice.liked_by_me);
   const [likeCount, setLikeCount] = useState(slice.like_count);
   const [retweeted, setRetweeted] = useState(slice.retweeted_by_me);
   const [retweetCount, setRetweetCount] = useState(slice.retweet_count);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     setLiked(slice.liked_by_me);
@@ -88,6 +110,15 @@ export function SliceCard({ slice, showRepostedBy }: SliceCardProps) {
     navigate(`/profile/${slice.username}`);
   };
 
+  const handleDelete = async () => {
+    await deletePost(slice.id);
+    window.dispatchEvent(new Event('feed:refresh'));
+    onDelete?.(slice.id);
+    setDeleteDialogOpen(false);
+  };
+
+  const isOwnPost = currentUser?.id === slice.user_id;
+
   return (
     <div className="border-2 border-border bg-card">
       {showRepostedBy && (
@@ -116,6 +147,18 @@ export function SliceCard({ slice, showRepostedBy }: SliceCardProps) {
             </button>
             <p className="text-sm text-muted-foreground">{formatTimestamp(slice.created_at)}</p>
           </div>
+          {isOwnPost ? (
+            <button
+              aria-label="Delete post"
+              onClick={(event) => {
+                event.stopPropagation();
+                setDeleteDialogOpen(true);
+              }}
+              className="text-destructive hover:text-destructive/80"
+            >
+              <Trash2 size={18} />
+            </button>
+          ) : null}
         </div>
 
         <p className="text-foreground mb-4 whitespace-pre-wrap">{slice.content}</p>
@@ -155,6 +198,34 @@ export function SliceCard({ slice, showRepostedBy }: SliceCardProps) {
           </button>
         </div>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-card border-2 border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The post will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="border-2 border-border"
+              onClick={(event) => event.stopPropagation()}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleDelete();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 border-2 border-border"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

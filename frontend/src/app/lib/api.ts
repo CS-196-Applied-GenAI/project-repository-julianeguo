@@ -14,6 +14,7 @@ export interface ProfileUser {
   follower_count: number;
   following_count: number;
   is_following: boolean;
+  is_blocked?: boolean;
 }
 
 export interface Post {
@@ -83,16 +84,7 @@ const apiBaseFromProcess =
     ? processMaybe.env.VITE_API_BASE
     : undefined;
 
-const apiBaseFromImportMeta =
-  typeof import.meta !== "undefined" &&
-  (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env &&
-  typeof (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
-    ?.VITE_API_BASE === "string"
-    ? (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
-        ?.VITE_API_BASE
-    : undefined;
-
-const API_BASE = apiBaseFromGlobal ?? apiBaseFromImportMeta ?? apiBaseFromProcess;
+const API_BASE = apiBaseFromGlobal ?? apiBaseFromProcess;
 
 const withBase = (path: string) => `${API_BASE ?? ""}${path}`;
 
@@ -177,6 +169,12 @@ export async function createPost(content: string): Promise<Post> {
   });
 }
 
+export async function deletePost(postId: number): Promise<void> {
+  await request(`/api/posts/${postId}`, {
+    method: "DELETE"
+  });
+}
+
 export async function getPost(postId: number): Promise<Post & { username: string; profile_picture_url: string | null }> {
   return request(`/api/posts/${postId}`);
 }
@@ -238,4 +236,14 @@ export async function blockUser(id: number): Promise<void> {
 
 export async function unblockUser(id: number): Promise<void> {
   await request(`/api/users/${id}/block`, { method: "DELETE" });
+}
+
+export async function updateMyProfile(payload: {
+  username?: string;
+  bio?: string | null;
+}): Promise<User> {
+  return request<User>("/api/users/me", {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
 }

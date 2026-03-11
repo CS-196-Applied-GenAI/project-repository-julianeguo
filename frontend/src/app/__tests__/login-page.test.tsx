@@ -44,4 +44,21 @@ describe("LoginPage", () => {
     expect(mockLogin).toHaveBeenCalledWith("baker_bella", "Password123!");
     expect(mockNavigate).toHaveBeenCalledWith("/feed");
   });
+
+  test("submits signup and navigates to feed on success", async () => {
+    mockSignup.mockResolvedValue({ success: true });
+    render(
+      <MemoryRouter>
+        <LoginPage initialTab="signup" />
+      </MemoryRouter>
+    );
+
+    await userEvent.type(screen.getByLabelText("Username"), "new_user");
+    await userEvent.type(screen.getByLabelText("Email"), "new@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "Password123!");
+    await userEvent.click(screen.getByRole("button", { name: /sign up/i }));
+
+    expect(mockSignup).toHaveBeenCalledWith("new_user", "new@example.com", "Password123!");
+    expect(mockNavigate).toHaveBeenCalledWith("/feed");
+  });
 });

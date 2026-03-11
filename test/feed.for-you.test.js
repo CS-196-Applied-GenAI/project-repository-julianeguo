@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import request from "supertest";
 import { createApp } from "../src/app.js";
 
-function createFeedQueryMock({ users = [], posts = [], blocks = [], likes = [], retweets = [] } = {}) {
+function createFeedQueryMock({ users = [], posts = [], blocks = [], likes = [], retweets = [], replies = [] } = {}) {
   return async function queryFn(sql, params = []) {
     if (sql.startsWith("SELECT id, username, password_hash FROM users WHERE LOWER(username)")) {
       const [normalizedUsername] = params;
@@ -35,6 +35,7 @@ function createFeedQueryMock({ users = [], posts = [], blocks = [], likes = [], 
           const retweetedByMe = retweets.some(
             (row) => row.post_id === post.id && row.user_id === retweetViewerId
           );
+          const replyCount = replies.filter((row) => row.parent_post_id === post.id).length;
           return {
             id: post.id,
             user_id: post.user_id,
@@ -45,7 +46,8 @@ function createFeedQueryMock({ users = [], posts = [], blocks = [], likes = [], 
             like_count: likeCount,
             liked_by_me: likedByMe ? 1 : 0,
             retweet_count: retweetCount,
-            retweeted_by_me: retweetedByMe ? 1 : 0
+            retweeted_by_me: retweetedByMe ? 1 : 0,
+            reply_count: replyCount
           };
         })
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -89,7 +91,12 @@ test("GET /api/feed/for-you returns <=20 newest posts excluding blocked authors"
     { user_id: 1, post_id: 1 },
     { user_id: 2, post_id: 1 }
   ];
-  const queryFn = createFeedQueryMock({ users, posts, blocks, likes, retweets });
+  const replies = [
+    { id: 1, parent_post_id: 1 },
+    { id: 2, parent_post_id: 1 },
+    { id: 3, parent_post_id: 2 }
+  ];
+  const queryFn = createFeedQueryMock({ users, posts, blocks, likes, retweets, replies });
   const app = createApp({ authQueryFn: queryFn, feedQueryFn: queryFn, sessionSecret: "test-secret" });
   const agent = request.agent(app);
 
@@ -111,6 +118,7 @@ test("GET /api/feed/for-you returns <=20 newest posts excluding blocked authors"
   assert.equal(response.body.every((post) => Object.hasOwn(post, "liked_by_me")), true);
   assert.equal(response.body.every((post) => Object.hasOwn(post, "retweet_count")), true);
   assert.equal(response.body.every((post) => Object.hasOwn(post, "retweeted_by_me")), true);
+  assert.equal(response.body.every((post) => Object.hasOwn(post, "reply_count")), true);
   assert.equal(response.body.some((post) => Object.hasOwn(post, "retweeter_id")), false);
   assert.equal(response.body.some((post) => Object.hasOwn(post, "type") && post.type === "retweet"), false);
 });

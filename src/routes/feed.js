@@ -3,6 +3,10 @@ import { query as dbQuery } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getBlockedSet } from "../services/block.js";
 
+function logFeedRouteError(routeName, error) {
+  console.error(`[feed] ${routeName} failed`, error);
+}
+
 export function createFeedRouter({ queryFn = dbQuery } = {}) {
   const router = Router();
 
@@ -29,7 +33,8 @@ export function createFeedRouter({ queryFn = dbQuery } = {}) {
             SELECT 1
             FROM retweets r2
             WHERE r2.post_id = p.id AND r2.user_id = ?
-          ) AS retweeted_by_me
+          ) AS retweeted_by_me,
+          (SELECT COUNT(*) FROM replies re WHERE re.parent_post_id = p.id) AS reply_count
         FROM posts p
         JOIN users u ON u.id = p.user_id
         ORDER BY p.created_at DESC`,
@@ -43,12 +48,14 @@ export function createFeedRouter({ queryFn = dbQuery } = {}) {
           like_count: Number(post.like_count),
           liked_by_me: Boolean(post.liked_by_me),
           retweet_count: Number(post.retweet_count),
-          retweeted_by_me: Boolean(post.retweeted_by_me)
+          retweeted_by_me: Boolean(post.retweeted_by_me),
+          reply_count: Number(post.reply_count)
         }))
         .slice(0, 20);
 
       return res.status(200).json(visiblePosts);
     } catch (error) {
+      logFeedRouteError("for-you", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });
@@ -86,17 +93,17 @@ export function createFeedRouter({ queryFn = dbQuery } = {}) {
             SELECT 1
             FROM retweets r2
             WHERE r2.post_id = p.id AND r2.user_id = ?
-          ) AS retweeted_by_me
+          ) AS retweeted_by_me,
+          (SELECT COUNT(*) FROM replies re WHERE re.parent_post_id = p.id) AS reply_count
         FROM posts p
         JOIN users u ON u.id = p.user_id
         WHERE p.user_id IN (${placeholders})
         ORDER BY p.created_at DESC`,
-        [...followedIds, viewerId, viewerId]
+        [viewerId, viewerId, ...followedIds]
       );
 
       const retweets = await queryFn(
         `SELECT
-          r.id AS retweet_id,
           r.user_id AS retweeter_id,
           r.post_id AS original_post_id,
           r.created_at AS retweeted_at,
@@ -117,6 +124,7 @@ export function createFeedRouter({ queryFn = dbQuery } = {}) {
             FROM retweets r3
             WHERE r3.post_id = p.id AND r3.user_id = ?
           ) AS original_retweeted_by_me,
+          (SELECT COUNT(*) FROM replies re WHERE re.parent_post_id = p.id) AS original_reply_count,
           au.username AS original_author_username,
           au.profile_picture_url AS original_author_profile_picture_url
         FROM retweets r
@@ -125,7 +133,7 @@ export function createFeedRouter({ queryFn = dbQuery } = {}) {
         JOIN users au ON au.id = p.user_id
         WHERE r.user_id IN (${placeholders})
         ORDER BY r.created_at DESC`,
-        [...followedIds, viewerId, viewerId]
+        [viewerId, viewerId, ...followedIds]
       );
 
       const postItems = posts
@@ -141,7 +149,8 @@ export function createFeedRouter({ queryFn = dbQuery } = {}) {
             like_count: Number(post.like_count),
             liked_by_me: Boolean(post.liked_by_me),
             retweet_count: Number(post.retweet_count),
-            retweeted_by_me: Boolean(post.retweeted_by_me)
+            retweeted_by_me: Boolean(post.retweeted_by_me),
+            reply_count: Number(post.reply_count)
           },
           author: {
             id: post.user_id,
@@ -172,7 +181,8 @@ export function createFeedRouter({ queryFn = dbQuery } = {}) {
             like_count: Number(retweet.original_like_count),
             liked_by_me: Boolean(retweet.original_liked_by_me),
             retweet_count: Number(retweet.original_retweet_count),
-            retweeted_by_me: Boolean(retweet.original_retweeted_by_me)
+            retweeted_by_me: Boolean(retweet.original_retweeted_by_me),
+            reply_count: Number(retweet.original_reply_count)
           },
           author: {
             id: retweet.original_author_id,
@@ -188,6 +198,7 @@ export function createFeedRouter({ queryFn = dbQuery } = {}) {
 
       return res.status(200).json(feedItems);
     } catch (error) {
+      logFeedRouteError("following", error);
       return res.status(500).json({ message: "Internal server error." });
     }
   });

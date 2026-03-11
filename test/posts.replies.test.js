@@ -44,11 +44,14 @@ function createRepliesQueryMock({ users = [], posts = [], replies = [], blocks =
       return { insertId: reply.id };
     }
 
-    if (sql.startsWith("SELECT id, user_id, parent_post_id, content, created_at FROM replies WHERE id = ?")) {
+    if (sql.startsWith("SELECT") && sql.includes("FROM replies r") && sql.includes("WHERE r.id = ?")) {
       const [replyId] = params;
       return state.replies
         .filter((reply) => reply.id === replyId)
         .map((reply) => ({
+          username: state.users.find((user) => user.id === reply.user_id)?.username ?? null,
+          profile_picture_url:
+            state.users.find((user) => user.id === reply.user_id)?.profile_picture_url ?? null,
           id: reply.id,
           user_id: reply.user_id,
           parent_post_id: reply.parent_post_id,
@@ -129,6 +132,8 @@ test("POST /api/posts/:id/replies creates reply and returns 201", async () => {
   assert.equal(response.body.user_id, 1);
   assert.equal(response.body.parent_post_id, 10);
   assert.equal(response.body.content, "first reply");
+  assert.equal(response.body.username, "viewer");
+  assert.equal(response.body.profile_picture_url, null);
 });
 
 test("POST /api/posts/:id/replies returns 400 for empty content", async () => {

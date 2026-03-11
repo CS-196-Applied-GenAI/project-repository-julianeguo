@@ -18,7 +18,7 @@ function createProfileQueryMock({ users = [], follows = [] } = {}) {
     }
 
     if (sql.startsWith("SELECT") && sql.includes("FROM users u")) {
-      const [viewerId, userId] = params;
+      const [viewerId, , userId] = params;
       const user = users.find((row) => row.id === userId);
       if (!user) {
         return [];
@@ -37,7 +37,8 @@ function createProfileQueryMock({ users = [], follows = [] } = {}) {
           profile_picture_url: user.profile_picture_url ?? null,
           follower_count: followerCount,
           following_count: followingCount,
-          is_following: isFollowing ? 1 : 0
+          is_following: isFollowing ? 1 : 0,
+          is_blocked: 0
         }
       ];
     }
@@ -93,7 +94,8 @@ test("GET /api/users/:id returns public profile and counts when authenticated", 
     profile_picture_url: "/uploads/p2.png",
     follower_count: 2,
     following_count: 1,
-    is_following: true
+    is_following: true,
+    is_blocked: false
   });
   assert.equal(Object.hasOwn(response.body, "email"), false);
   assert.equal(Object.hasOwn(response.body, "password"), false);

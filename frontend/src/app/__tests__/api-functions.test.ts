@@ -2,6 +2,7 @@ import {
   blockUser,
   createPost,
   createReply,
+  deletePost,
   deleteReply,
   followUser,
   forgotPassword,
@@ -24,6 +25,7 @@ import {
   unfollowUser,
   unlikePost,
   unretweetPost,
+  updateMyProfile,
 } from "../lib/api";
 
 function mockJsonResponse(body: unknown, ok = true, status = 200) {
@@ -64,6 +66,10 @@ describe("api.ts functions", () => {
     await forgotPassword("u@example.com");
     fetchMock.mockResolvedValueOnce(mockJsonResponse({}));
     await resetPassword("token", "Password1!");
+    fetchMock.mockResolvedValueOnce(
+      mockJsonResponse({ id: 1, username: "updated", bio: "bio", profile_picture_url: null })
+    );
+    await updateMyProfile({ username: "updated", bio: "bio" });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -95,6 +101,11 @@ describe("api.ts functions", () => {
       "/api/auth/reset-password",
       expect.objectContaining({ method: "POST", credentials: "include" })
     );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      7,
+      "/api/users/me",
+      expect.objectContaining({ method: "PATCH", credentials: "include" })
+    );
   });
 
   test("feed/post/reply API functions call expected endpoints", async () => {
@@ -108,7 +119,8 @@ describe("api.ts functions", () => {
       .mockResolvedValueOnce(mockJsonResponse({}))
       .mockResolvedValueOnce(mockJsonResponse({}))
       .mockResolvedValueOnce(mockJsonResponse([]))
-      .mockResolvedValueOnce(mockJsonResponse({ id: 100 }));
+      .mockResolvedValueOnce(mockJsonResponse({ id: 100 }))
+      .mockResolvedValueOnce(mockJsonResponse({}));
 
     await getForYouFeed();
     await getFollowingFeed();
@@ -122,6 +134,7 @@ describe("api.ts functions", () => {
     await createReply(1, "reply");
     fetchMock.mockResolvedValueOnce(mockJsonResponse({}));
     await deleteReply(100);
+    await deletePost(1);
 
     expect(fetchMock).toHaveBeenCalledWith("/api/feed/for-you", expect.any(Object));
     expect(fetchMock).toHaveBeenCalledWith("/api/feed/following", expect.any(Object));
@@ -153,6 +166,10 @@ describe("api.ts functions", () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/replies/100",
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/posts/1",
       expect.objectContaining({ method: "DELETE" })
     );
   });

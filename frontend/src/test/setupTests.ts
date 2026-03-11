@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import { TextDecoder, TextEncoder } from "node:util";
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,
@@ -22,3 +23,7 @@ class ResizeObserverMock {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (window as any).ResizeObserver = ResizeObserverMock;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(global as any).TextEncoder = TextEncoder;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(global as any).TextDecoder = TextDecoder;

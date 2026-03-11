@@ -15,7 +15,9 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import {
+  createPost,
   createReply,
+  deletePost,
   deleteReply,
   getAssetUrl,
   getPost,
@@ -38,6 +40,7 @@ export function SliceDetailPage() {
   const [replyModalOpen, setReplyModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteReplyId, setDeleteReplyId] = useState<number | null>(null);
+  const [deletePostDialogOpen, setDeletePostDialogOpen] = useState(false);
   const [slice, setSlice] = useState<DetailPost | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
 
@@ -138,7 +141,15 @@ export function SliceDetailPage() {
 
   const handleReply = async (content: string) => {
     const createdReply = await createReply(slice.id, content);
-    setReplies((prev) => [...prev, createdReply]);
+    setReplies((prev) => [
+      ...prev,
+      {
+        ...createdReply,
+        username: createdReply.username || currentUser?.username || 'unknown',
+        profile_picture_url:
+          createdReply.profile_picture_url ?? currentUser?.profile_picture_url ?? null,
+      },
+    ]);
   };
 
   const handleDeleteReply = (replyId: number) => {
@@ -155,6 +166,20 @@ export function SliceDetailPage() {
     setDeleteDialogOpen(false);
   };
 
+  const handleCreatePost = async (content: string) => {
+    await createPost(content);
+    window.dispatchEvent(new Event('feed:refresh'));
+    navigate('/feed');
+  };
+
+  const confirmDeletePost = async () => {
+    await deletePost(slice.id);
+    window.dispatchEvent(new Event('feed:refresh'));
+    navigate('/feed');
+  };
+
+  const isOwnPost = currentUser?.id === slice.user_id;
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation onPostClick={() => setPostModalOpen(true)} />
@@ -170,12 +195,21 @@ export function SliceDetailPage() {
                 </AvatarFallback>
               </Avatar>
             </button>
-            <div>
+            <div className="flex-1">
               <button onClick={() => navigate(`/profile/${slice.username}`)} className="hover:underline">
                 <p className="font-semibold text-foreground">@{slice.username}</p>
               </button>
               <p className="text-sm text-muted-foreground">{formatTimestamp(slice.created_at)}</p>
             </div>
+            {isOwnPost ? (
+              <button
+                aria-label="Delete post"
+                onClick={() => setDeletePostDialogOpen(true)}
+                className="text-destructive hover:text-destructive/80"
+              >
+                <Trash2 size={18} />
+              </button>
+            ) : null}
           </div>
 
           <p className="text-foreground mb-6 text-lg whitespace-pre-wrap">{slice.content}</p>
@@ -263,7 +297,11 @@ export function SliceDetailPage() {
         </div>
       </div>
 
-      <PostSliceModal open={postModalOpen} onClose={() => setPostModalOpen(false)} />
+      <PostSliceModal
+        open={postModalOpen}
+        onClose={() => setPostModalOpen(false)}
+        onPost={handleCreatePost}
+      />
 
       <PostSliceModal
         open={replyModalOpen}
@@ -285,6 +323,26 @@ export function SliceDetailPage() {
             <AlertDialogCancel className="border-2 border-border">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => void confirmDeleteReply()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 border-2 border-border"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deletePostDialogOpen} onOpenChange={setDeletePostDialogOpen}>
+        <AlertDialogContent className="bg-card border-2 border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The post will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-2 border-border">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void confirmDeletePost()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 border-2 border-border"
             >
               Delete

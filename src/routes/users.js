@@ -27,11 +27,16 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
             SELECT 1
             FROM follows f3
             WHERE f3.follower_id = ? AND f3.following_id = u.id
-          ) AS is_following
+          ) AS is_following,
+          EXISTS (
+            SELECT 1
+            FROM blocks b
+            WHERE b.blocker_id = ? AND b.blocked_id = u.id
+          ) AS is_blocked
         FROM users u
         WHERE LOWER(u.username) = ?
         LIMIT 1`,
-        [req.session.userId, normalizedUsername]
+        [req.session.userId, req.session.userId, normalizedUsername]
       );
 
       if (users.length === 0) {
@@ -46,7 +51,8 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
         profile_picture_url: user.profile_picture_url ?? null,
         follower_count: Number(user.follower_count),
         following_count: Number(user.following_count),
-        is_following: Boolean(user.is_following)
+        is_following: Boolean(user.is_following),
+        is_blocked: Boolean(user.is_blocked)
       });
     } catch (error) {
       return res.status(500).json({ message: "Internal server error." });
@@ -327,11 +333,16 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
             SELECT 1
             FROM follows f3
             WHERE f3.follower_id = ? AND f3.following_id = u.id
-          ) AS is_following
+          ) AS is_following,
+          EXISTS (
+            SELECT 1
+            FROM blocks b
+            WHERE b.blocker_id = ? AND b.blocked_id = u.id
+          ) AS is_blocked
         FROM users u
         WHERE u.id = ?
         LIMIT 1`,
-        [req.session.userId, userId]
+        [req.session.userId, req.session.userId, userId]
       );
 
       if (users.length === 0) {
@@ -346,7 +357,8 @@ export function createUsersRouter({ queryFn = dbQuery } = {}) {
         profile_picture_url: user.profile_picture_url ?? null,
         follower_count: Number(user.follower_count),
         following_count: Number(user.following_count),
-        is_following: Boolean(user.is_following)
+        is_following: Boolean(user.is_following),
+        is_blocked: Boolean(user.is_blocked)
       });
     } catch (error) {
       return res.status(500).json({ message: "Internal server error." });

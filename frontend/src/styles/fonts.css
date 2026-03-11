@@ -1,0 +1,6 @@
+/* Fun, bubbly font for branding */
+@import url('https://fonts.googleapis.com/css2?family=Bubblegum+Sans&display=swap');
+
+.logo-text {
+  font-family: 'Bubblegum Sans', 'Comic Sans MS', cursive;
+}
